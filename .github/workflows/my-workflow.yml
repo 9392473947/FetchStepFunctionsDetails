@@ -21,15 +21,14 @@ jobs:
 
       - name: Login to AWS ECR Public
         run: |
-          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 637423345974.dkr.ecr.ap-south-1.amazonaws.com
-
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/e2v8h6j1
       - name: Build Docker image
         run: |
-          docker build -t my-fast-api .
+          docker build -t fast-api .
       - name: Tag Docker image
         run: |
-          docker tag my-fast-api:latest 637423345974.dkr.ecr.ap-south-1.amazonaws.com/githubaction:latest
+          docker tag fast-api:latest public.ecr.aws/e2v8h6j1/githubaction:latest
 
       - name: Push Docker image to AWS ECR Public
         run: |
-          docker push 637423345974.dkr.ecr.ap-south-1.amazonaws.com/githubaction:latest
+          docker push public.ecr.aws/e2v8h6j1/githubaction:latest
