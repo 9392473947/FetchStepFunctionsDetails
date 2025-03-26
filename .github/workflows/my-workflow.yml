@@ -18,3 +18,18 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
+
+      - name: Login to AWS ECR Public
+        run: |
+          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 637423345974.dkr.ecr.ap-south-1.amazonaws.com
+
+      - name: Build Docker image
+        run: |
+          docker build -t my-fast-api .
+      - name: Tag Docker image
+        run: |
+          docker tag my-fast-api:latest 637423345974.dkr.ecr.ap-south-1.amazonaws.com/githubaction:latest
+
+      - name: Push Docker image to AWS ECR Public
+        run: |
+          docker push 637423345974.dkr.ecr.ap-south-1.amazonaws.com/githubaction:latest
