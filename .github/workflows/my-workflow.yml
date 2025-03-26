@@ -7,28 +7,82 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
+   #checkout the repository
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-       
+        
+      #set up aws cli 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
-
+          
+      #login to aws ecr public
       - name: Login to AWS ECR Public
         run: |
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/e2v8h6j1
+
+     #building docker image
       - name: Build Docker image
         run: |
           docker build -t fast-api .
+
+          #tag docker image
       - name: Tag Docker image
         run: |
           docker tag fast-api:latest public.ecr.aws/e2v8h6j1/githubaction:latest
 
+      #push docker image to aws ecr pulic
       - name: Push Docker image to AWS ECR Public
         run: |
           docker push public.ecr.aws/e2v8h6j1/githubaction:latest
+
+      #install minikube & start cluster
+      - name: Install & Start Minikube
+        run: |
+          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+          minikube start --driver=docker --cpus=2 --memory=4g
+
+        #install kubectl
+      - name: Install Kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      #Apply kubernates deployement
+      - name: Deploy FastAPI App to Minikube
+        run: |
+          kubectl apply -f deployment.yaml
+          kubectl apply -f service.yaml
+
+      #start minikube Tunnel for loadbalancer
+      - name: start minikube Tunnel
+        run: |
+          nohup minikube tunnel > /dev/null 2>&1 &
+
+      #wait for external IP
+      - name: wait for external IP
+        run: |
+          for i in {1..10}; do
+            EXTERNAL_IP=$(kubectl get svc fastapi-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [[ -n "$EXTERNAL IP" ]]; then
+              echo "EXTERNAL IP: $EXTERNAL_IP"
+              exit 0
+            fi
+            echo "Waiting for LoadBalancer IP..."
+            sleep 10
+          done
+          echo "Failed to get External IP"
+          exit 1
+
+      #Test FastAPI Service
+      - name: Test FastAPI Deployment
+        run: |
+          EXTERNAL_IP=$(kubectl get svc fastapi-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          curl http://$EXTERNAL_IP/docs || exit 1
+          
