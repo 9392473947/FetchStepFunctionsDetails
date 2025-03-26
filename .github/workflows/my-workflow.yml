@@ -63,7 +63,7 @@ jobs:
       #start minikube Tunnel for loadbalancer
       - name: start minikube Tunnel
         run: |
-          nohup minikube tunnel > /dev/null 2>&1 &
+          minikube tunnel
 
       #wait for external IP
       - name: wait for external IP
