@@ -65,23 +65,27 @@ jobs:
       - name: Use existing s3 bucket for kops state
         run: echo "KOPS_STATE_STORE=s3://${{ env.KOPS_STATE_BUCKET }}" >> $GITHUB_ENV
 
-      #create kubernates cluster
-      - name: Create kubernetes cluster
+      - name: Create or Update Kubernetes Cluster
         run: |
-          kops create cluster \
-            --name=${{ env.CLUSTER_NAME }} \
-            --state=${{ env.KOPS_STATE_STORE }} \
-            --cloud=aws \
-            --zones=${{ env.ZONES }} \
-            --node-count=${{ env.NODE_COUNT }} \
-            --node-size=${{ env.NODE_SIZE }} \
-            --master-size=${{ env.CONTROL_PLANE_SIZE }} \
-            --dns-zone=${{ env.CLUSTER_NAME }}
+          export KOPS_STATE_STORE=s3://${{ env.KOPS_STATE_BUCKET }}
 
-      #update cluster
-      - name: Update cluster
-        run: |
-          kops update cluster --name=${{ env.CLUSTER_NAME }} --state=${{ env.KOPS_STATE_STORE }} --yes
+          if kops get cluster ${{ env.CLUSTER_NAME }} --state=${KOPS_STATE_STORE} > /dev/null 2>&1; then
+            echo "Cluster already exists, updating..."
+            kops update cluster ${{ env.CLUSTER_NAME }} --state=${KOPS_STATE_STORE} --yes
+          else
+            echo "Creating a new cluster..."
+            kops create cluster \
+              --name=${{ env.CLUSTER_NAME }} \
+              --state=${KOPS_STATE_STORE} \
+              --cloud=aws \    
+              --zones=${{ env.ZONES }} \
+              --node-count=${{ env.NODE_COUNT }} \
+              --node-size=${{ env.NODE_SIZE }} \    
+              --control-plane-size=${{ env.CONTROL_PLANE_SIZE }} \
+              --dns-zone=${{ env.CLUSTER_NAME }}
+          kops update cluster ${{ env.CLUSTER_NAME }} --state=${KOPS_STATE_STORE} --yes
+          fi
+
 
       #validate cluster
       - name: validate cluster
