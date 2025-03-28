@@ -112,9 +112,28 @@ jobs:
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
 
+      # ✅ Sleep before checking pod status to allow time for deployment
+      - name: Wait for Pods to be Ready
+        run: |
+          echo "Waiting for pods to be in Running state..."
+          sleep 60  # Wait for 1 minute before checking
+
+      # ✅ Check for pod readiness with retries
       - name: Verify Deployment
         run: |
-          kubectl get pods
+          for i in {1..5}; do
+            STATUS=$(kubectl get pods --no-headers -o custom-columns=":status.phase" | grep -v Running || true)
+            if [[ -z "$STATUS" ]]; then
+              echo "All pods are running."
+              break
+            else
+              echo "Waiting for pods to be ready... Retry: $i"
+              sleep 30
+            fi
+          done
+          
+          echo "Final pod status:"
+          kubectl get pods -o wide
           kubectl get svc -o wide
           
           
