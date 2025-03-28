@@ -53,6 +53,7 @@ jobs:
      #building docker image
       - name: Build Docker image
         run: |
+          docker buildx create --use  # Enable BuildKit
           docker build -t fast-api .
 
           #tag docker image
