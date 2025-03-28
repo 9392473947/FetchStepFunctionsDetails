@@ -30,6 +30,15 @@ jobs:
           sudo ./aws/install
           aws --version
 
+    # Install Docker
+      - name: Install Docker
+        run: |
+          sudo apt update
+          sudo apt install -y docker.io
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          docker --version
+
         
       #set up aws cli 
       - name: Configure AWS credentials
