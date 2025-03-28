@@ -65,6 +65,7 @@ jobs:
       - name: Use existing s3 bucket for kops state
         run: echo "KOPS_STATE_STORE=s3://${{ env.KOPS_STATE_BUCKET }}" >> $GITHUB_ENV
 
+      # Create or Update Kubernetes Cluster
       - name: Create or Update Kubernetes Cluster
         run: |
           export KOPS_STATE_STORE=s3://${{ env.KOPS_STATE_BUCKET }}
@@ -77,21 +78,25 @@ jobs:
             kops create cluster \
               --name=${{ env.CLUSTER_NAME }} \
               --state=${KOPS_STATE_STORE} \
-              --cloud=aws \    
+              --cloud=aws \
               --zones=${{ env.ZONES }} \
               --node-count=${{ env.NODE_COUNT }} \
-              --node-size=${{ env.NODE_SIZE }} \    
+              --node-size=${{ env.NODE_SIZE }} \
               --control-plane-size=${{ env.CONTROL_PLANE_SIZE }} \
               --dns-zone=${{ env.CLUSTER_NAME }}
-          kops update cluster ${{ env.CLUSTER_NAME }} --state=${KOPS_STATE_STORE} --yes
+            kops update cluster ${{ env.CLUSTER_NAME }} --state=${KOPS_STATE_STORE} --yes
           fi
 
+      # Export kubeconfig for kubectl
+      - name: Export kubectl Configuration
+        run: |
+          kops export kubecfg --name=${{ env.CLUSTER_NAME }} --state=${{ env.KOPS_STATE_STORE }}
 
       #validate cluster
       - name: validate cluster
         run: |
           kops validate cluster --state=${{ env.KOPS_STATE_STORE }}
-          
+        
 
         #install kubectl
       - name: Install Kubectl
