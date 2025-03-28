@@ -21,10 +21,13 @@ jobs:
         uses: actions/checkout@v4
 
     #install awscli
-      - name: install AWS CLI
+      - name: Install AWS CLI
         run: |
-          sudo apt update
-          sudo apt install -y awscli
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          aws --version
+
         
       #set up aws cli 
       - name: Configure AWS credentials
