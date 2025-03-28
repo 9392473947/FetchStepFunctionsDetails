@@ -1,4 +1,4 @@
-name: Deploy FastAPI to AWS ECR Public
+name: Deploy FastAPI
 
 on: 
   push:
@@ -6,11 +6,25 @@ on:
       - main
 jobs:
   build-and-push:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      KOPS_STATE_BUCKET: kopsbkt100
+      CLUSTER_NAME: kopscluster.k8s.local
+      NODE_COUNT: 2
+      NODE_SIZE: t3.small
+      MASTER_SIZE: t3.medium
+      ZONES: ap-south-1a
    #checkout the repository
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+    #install awscli
+      - name: install AWS CLI
+        run: |
+          sudo apt update
+          sudo apt install -y awscli
         
       #set up aws cli 
       - name: Configure AWS credentials
@@ -40,12 +54,41 @@ jobs:
         run: |
           docker push public.ecr.aws/e2v8h6j1/githubaction:latest
 
-      #install minikube & start cluster
-      - name: Install & Start Minikube
+      #install kops & start cluster
+      - name: Install kops
         run: |
-          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-          sudo install minikube-linux-amd64 /usr/local/bin/minikube
-          minikube start --driver=docker --cpus=2 --memory=4g
+          curl -LO https://github.com/kubernetes/kops/releases/latest/download/kops-linux-amd64
+          chmod +x kops-linux-amd64
+          sudo mv kops-linux-amd64 /usr/local/bin/kops
+          kops version
+
+      #use existing s3 bucket for kops state
+      - name: Use existing s3 bucket for kops state
+        run: echo "KOPS_STATE_STORE=s3://${{ env.KOPS_STATE_BUCKET }}" >> $GITHUB_ENV
+
+      #create kubernates cluster
+      - name: Create kubernetes cluster
+        run: |
+          kops create cluster \
+            --name=${{ env.CLUSTER_NAME }} \
+            --state=${{ env.KOPS_STATE_STORE }} \
+            --cloud=aws \
+            --zones=${{ env.ZONES }} \
+            --node-count=${{ env.NODE_COUNT }} \
+            --node-size=${{ env.NODE_SIZE }} \
+            --master-size=${{ env.MASTER_SIZE }} \
+            --dns-zone=${{ env.CLUSTER_NAME }}
+
+      #update cluster
+      - name: Update cluster
+        run: |
+          kops update cluster --name=${{ env.CLUSTER_NAME }} --state=${{ env.KOPS_STATE_STORE }} --yes
+
+      #validate cluster
+      - name: validate cluster
+        run: |
+          kops validate cluster --state=${{ env.KOPS_STATE_STORE }}
+          
 
         #install kubectl
       - name: Install Kubectl
@@ -54,35 +97,19 @@ jobs:
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
+      - name: Configure kubectl for Kops Cluster
+        run: |
+          kops export kubecfg --name=${{ env.CLUSTER_NAME }} --state=${{ env.KOPS_STATE_STORE }}
+
       #Apply kubernates deployement
-      - name: Deploy FastAPI App to Minikube
+      - name: Deploy FastAPI App to kops
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
 
-      #start minikube Tunnel for loadbalancer
-      - name: start minikube Tunnel
+      - name: Verify Deployment
         run: |
-          nohup minikube tunnel > /dev/null 2>&1 &
-
-      #wait for external IP
-      - name: wait for external IP
-        run: |
-          for i in {1..10}; do
-            EXTERNAL_IP=$(kubectl get svc fastapi-service -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            if [[ -n "$EXTERNAL IP" ]]; then
-              echo "EXTERNAL IP: $EXTERNAL_IP"
-              exit 0
-            fi
-            echo "Waiting for LoadBalancer IP..."
-            sleep 10
-          done
-          echo "Failed to get External IP"
-          exit 1
-
-      #Test FastAPI Service
-      - name: Test FastAPI Deployment
-        run: |
-          EXTERNAL_IP=$(minikube service fastapi-service --url)
-          curl http://$EXTERNAL_IP/docs || exit 1
+          kubectl get pods
+          kubectl get svc -o wide
+          
           
