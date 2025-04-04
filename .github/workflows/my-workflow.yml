@@ -6,7 +6,7 @@ on:
       - main
 jobs:
   build-and-push:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
       KOPS_STATE_BUCKET: kopsbkt100
